@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Skincare Visualizer</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc; /* Slate 50 */
+        }
+        /* Custom loading spinner styles */
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-left-color: #3b82f6; /* Blue 500 */
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+    <div id="app-container" class="w-full max-w-2xl bg-white shadow-xl rounded-xl p-6 md:p-10 border border-gray-100">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl font-extrabold text-gray-800 mb-2">My Skincare Blueprint</h1>
+            <p class="text-gray-500">Analyze your skin visually and get expert advice.</p>
+        </header>
+
+        <!-- Input Section -->
+        <div id="input-section" class="space-y-6">
+            
+            <!-- Skin Type Selector -->
+            <div>
+                <label for="skinType" class="block text-sm font-medium text-gray-700 mb-2">1. Select Your Skin Type</label>
+                <select id="skinType" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out shadow-sm bg-white">
+                    <option value="" disabled selected>Choose a type...</option>
+                    <option value="Dry">Dry (Tight, flaky, needs hydration)</option>
+                    <option value="Oily">Oily (Shiny, prone to breakouts)</option>
+                    <option value="Combination">Combination (Oily T-zone, dry cheeks)</option>
+                    <option value="Normal">Normal (Balanced, few concerns)</option>
+                    <option value="Sensitive">Sensitive (Easily irritated, red)</option>
+                </select>
+            </div>
+
+            <!-- Concern Input -->
+            <div>
+                <label for="concern" class="block text-sm font-medium text-gray-700 mb-2">2. What is your main skincare concern?</label>
+                <input type="text" id="concern" placeholder="e.g., fine lines, acne scarring, dullness" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 transition duration-150 ease-in-out shadow-sm">
+            </div>
+
+            <!-- Image Input Section (New Step 3) -->
+            <div id="image-input-section" class="space-y-4 pt-6 border-t border-gray-200">
+                <label class="block text-sm font-medium text-gray-700 mb-2">3. Analyze Your Skin (Optional: Camera or Upload)</label>
+                
+                <div class="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4">
+                    <!-- Camera/Preview Area -->
+                    <div class="flex-1 space-y-2">
+                        <!-- Webcam video element -->
+                        <video id="webcam-video" autoplay class="w-full h-auto max-h-64 rounded-lg border border-gray-300 bg-gray-100 hidden"></video>
+                        <!-- Canvas used for photo capture AND resizing -->
+                        <canvas id="photo-canvas" class="hidden"></canvas>
+                        
+                        <div id="image-preview-container" class="w-full h-40 flex items-center justify-center rounded-lg border border-gray-300 bg-gray-100 hidden">
+                             <img id="image-preview" class="max-w-full max-h-full object-contain rounded-lg" alt="Skin Preview">
+                        </div>
+
+                        <div id="initial-placeholder" class="w-full h-40 flex items-center justify-center rounded-lg border border-dashed border-gray-400 bg-gray-50 text-gray-500 text-sm">
+                             <span id="placeholder-text">Click "Start Camera" or Upload Image</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Controls -->
+                    <div class="w-full md:w-36 flex flex-col space-y-2">
+                        <button onclick="initCamera()" id="camera-btn" class="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 rounded-lg shadow-md transition duration-200">
+                            Start Camera
+                        </button>
+                        <button onclick="capturePhoto()" id="capture-btn" class="bg-amber-500 hover:bg-amber-600 text-white font-semibold py-2 rounded-lg shadow-md transition duration-200 hidden" disabled>
+                            Capture Photo
+                        </button>
+                        
+                        <label for="image-upload" class="cursor-pointer text-center bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 rounded-lg shadow-md transition duration-200">
+                            Upload Image
+                        </label>
+                        <input type="file" id="image-upload" accept="image/*" class="hidden" onchange="handleFileUpload(event)">
+                        
+                        <button onclick="clearImage()" id="clear-btn" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 rounded-lg shadow-md transition duration-200 hidden">
+                            Clear Image
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Generate Button (Now Step 4) -->
+            <button onclick="generateRoutine()" id="generate-btn" 
+                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg shadow-md transition duration-200 ease-in-out flex items-center justify-center disabled:opacity-50 mt-6">
+                <span id="btn-text">Generate My Routine & Tip</span>
+                <div id="btn-spinner" class="spinner ml-2 hidden"></div>
+            </button>
+        </div>
+
+        <!-- Output Section (Hidden initially) -->
+        <div id="output-section" class="mt-8 hidden">
+            <h2 class="text-2xl font-bold text-gray-800 border-b pb-2 mb-4">Your Personalized Blueprint</h2>
+
+            <!-- Visual Analysis Section -->
+            <div id="visual-analysis" class="mb-4 hidden">
+                 <h3 class="text-xl font-bold text-gray-700 mb-3">Visual Analysis</h3>
+                 <img id="final-image-preview" class="w-20 h-20 rounded-lg object-cover mb-2 border border-gray-200" alt="Analyzed Skin Preview">
+                 <p class="text-sm text-gray-500">Advice tailored to this image.</p>
+            </div>
+
+            <!-- Standard Routine -->
+            <div class="bg-blue-50 p-4 rounded-lg mb-6 border border-blue-200">
+                <h3 class="text-lg font-semibold text-blue-800 mb-3">Core Routine Structure</h3>
+                <div id="routine-steps" class="space-y-4">
+                    <!-- Routine steps will be injected here -->
+                </div>
+            </div>
+
+            <!-- Personalized Tip from AI -->
+            <div class="bg-emerald-50 p-4 rounded-lg border border-emerald-200">
+                <h3 class="text-lg font-semibold text-emerald-800 mb-3 flex items-center">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M3.636 5.636l.707.707m0 5.656h-1.414M20.485 13.657h-1.414M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 8a5 5 0 01-10 0 5 5 0 0110 0zM12 10V4.5M16 14v-4m-8 4v-4"></path></svg>
+                    AI Personalized Tip
+                </h3>
+                <p id="ai-tip" class="text-gray-700 italic leading-relaxed"></p>
+                <!-- Citations -->
+                <div id="citations" class="mt-3 text-xs text-gray-500 space-y-1"></div>
+            </div>
+
+            <button onclick="resetApp()" 
+                class="mt-6 w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-lg transition duration-200 ease-in-out">
+                Start New Routine
+            </button>
+        </div>
+        
+        <!-- Error Message Box -->
+        <div id="error-message" class="hidden mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg text-sm" role="alert">
+            <!-- Error content will be injected here -->
+        </div>
+
+    </div>
+
+    <script>
+        const API_URL_BASE = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent';
+        // -------------------------------------------------------------------
+        // API KEY REMOVED for secure execution within the Canvas environment.
+        // If running externally (e.g., VS Code), replace "" with your actual key.
+        // -------------------------------------------------------------------
+        const API_KEY = "AIzaSyCGWNB3YukUjASS4OXZddOqRaEB1I5ueic";
+
+        // --- UI Element References ---
+        const skinTypeSelect = document.getElementById('skinType');
+        const concernInput = document.getElementById('concern');
+        const generateBtn = document.getElementById('generate-btn');
+        const btnText = document.getElementById('btn-text');
+        const btnSpinner = document.getElementById('btn-spinner');
+        const outputSection = document.getElementById('output-section');
+        const routineSteps = document.getElementById('routine-steps');
+        const aiTip = document.getElementById('ai-tip');
+        const citationsDiv = document.getElementById('citations');
+        const errorMessageDiv = document.getElementById('error-message');
+        const inputSection = document.getElementById('input-section');
+        const finalImagePreview = document.getElementById('final-image-preview');
+        const visualAnalysisSection = document.getElementById('visual-analysis');
+
+        // --- NEW IMAGE ELEMENTS ---
+        let videoStream = null;
+        let base64Image = null; // Stores the Base64 image data (data:image/jpeg;base64,...)
+        const webcamVideo = document.getElementById('webcam-video');
+        const photoCanvas = document.getElementById('photo-canvas');
+        const captureBtn = document.getElementById('capture-btn');
+        const cameraBtn = document.getElementById('camera-btn');
+        const clearBtn = document.getElementById('clear-btn');
+        const imagePreviewContainer = document.getElementById('image-preview-container');
+        const imagePreview = document.getElementById('image-preview');
+        const initialPlaceholder = document.getElementById('initial-placeholder');
+        const placeholderText = document.getElementById('placeholder-text');
+
+        /**
+         * Sets the loading state for the button.
+         * @param {boolean} isLoading
+         */
+        function setLoadingState(isLoading) {
+            generateBtn.disabled = isLoading;
+            if (isLoading) {
+                btnText.textContent = 'Generating...';
+                btnSpinner.classList.remove('hidden');
+                generateBtn.classList.add('cursor-not-allowed');
+            } else {
+                btnText.textContent = 'Generate My Routine & Tip';
+                btnSpinner.classList.add('hidden');
+                generateBtn.classList.remove('cursor-not-allowed');
+            }
+        }
+
+        /**
+         * Shows a user-friendly error message.
+         * @param {string} message - The error message to display.
+         */
+        function displayError(message) {
+            errorMessageDiv.textContent = message;
+            errorMessageDiv.classList.remove('hidden');
+            setTimeout(() => errorMessageDiv.classList.add('hidden'), 8000); // Extended visibility for warnings
+        }
+
+        // --- IMAGE UTILITY FUNCTIONS ---
+        
+        /**
+         * Resizes a Base64 image URL to a max width/height and returns a new Base64 URL.
+         * This prevents large images from causing API timeouts (503 errors).
+         * @param {string} dataUrl - The Base64 image string.
+         * @param {number} maxWidth - Maximum width for the resized image.
+         * @param {number} maxHeight - Maximum height for the resized image.
+         * @returns {Promise<string>} New resized Base64 image string.
+         */
+        function resizeImage(dataUrl, maxWidth = 800, maxHeight = 800) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = function() {
+                    let width = img.width;
+                    let height = img.height;
+                    let mimeType = dataUrl.split(';')[0].split(':')[1] || 'image/jpeg';
+                    
+                    // Determine new dimensions
+                    if (width > height) {
+                        if (width > maxWidth) {
+                            height *= maxWidth / width;
+                            width = maxWidth;
+                        }
+                    } else {
+                        if (height > maxHeight) {
+                            width *= maxHeight / height;
+                            height = maxHeight;
+                        }
+                    }
+
+                    // Set canvas dimensions and draw the image
+                    const canvas = document.createElement('canvas');
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    // Get the resized Base64 string
+                    resolve(canvas.toDataURL(mimeType, 0.8)); // 0.8 quality for smaller file size
+                };
+                img.src = dataUrl;
+            });
+        }
+
+        /**
+         * Converts File/Blob to Base64 data URL.
+         */
+        function fileToBase64(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = error => reject(error);
+                reader.readAsDataURL(file);
+            });
+        }
+
+        /**
+         * Displays the image data in the preview area.
+         */
+        function displayPreview(dataUrl) {
+            imagePreview.src = dataUrl;
+            imagePreviewContainer.classList.remove('hidden');
+            initialPlaceholder.classList.add('hidden');
+            clearBtn.classList.remove('hidden');
+        }
+
+        // --- CAMERA FUNCTIONS ---
+
+        async function initCamera() {
+            if (videoStream) {
+                // Stop and clear if already running
+                clearCamera();
+                return;
+            }
+            
+            try {
+                // Clear any captured/uploaded image first
+                clearImage(false); 
+                
+                videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                webcamVideo.srcObject = videoStream;
+                webcamVideo.classList.remove('hidden');
+                initialPlaceholder.classList.add('hidden');
+                
+                cameraBtn.textContent = 'Stop Camera';
+                captureBtn.classList.remove('hidden');
+                captureBtn.disabled = false;
+                placeholderText.textContent = 'Live Feed Active';
+
+            } catch (err) {
+                console.error("Error accessing camera:", err);
+                displayError("Could not access the camera. Please check camera permissions in your browser.");
+                
+                // Cleanup on failure
+                cameraBtn.textContent = 'Start Camera';
+                webcamVideo.classList.add('hidden');
+                initialPlaceholder.classList.remove('hidden');
+                captureBtn.classList.add('hidden');
+                captureBtn.disabled = true;
+                placeholderText.textContent = 'Click "Start Camera" or Upload Image';
+            }
+        }
+
+        async function capturePhoto() {
+            if (!videoStream) return;
+            
+            const width = webcamVideo.videoWidth;
+            const height = webcamVideo.videoHeight;
+            
+            photoCanvas.width = width;
+            photoCanvas.height = height;
+            const ctx = photoCanvas.getContext('2d');
+            
+            // Draw the current video frame onto the canvas
+            ctx.drawImage(webcamVideo, 0, 0, width, height);
+            
+            // Get the image data as a Base64 string (JPEG format)
+            const capturedDataUrl = photoCanvas.toDataURL('image/jpeg', 1.0);
+            
+            // Stop the camera stream
+            clearCamera();
+
+            // Resize and store the Base64 image
+            base64Image = await resizeImage(capturedDataUrl);
+
+            // Display the resized photo
+            displayPreview(base64Image);
+            cameraBtn.textContent = 'Start Camera'; // Reset button text
+        }
+        
+        function clearCamera() {
+            if (videoStream) {
+                videoStream.getTracks().forEach(track => track.stop());
+                videoStream = null;
+            }
+            webcamVideo.srcObject = null;
+            webcamVideo.classList.add('hidden');
+            cameraBtn.textContent = 'Start Camera';
+            captureBtn.classList.add('hidden');
+            captureBtn.disabled = true;
+            placeholderText.textContent = 'Click "Start Camera" or Upload Image';
+        }
+
+        // --- UPLOAD FUNCTION ---
+
+        async function handleFileUpload(event) {
+            clearCamera(); // Ensure camera is off
+            const file = event.target.files[0];
+            if (file && file.type.startsWith('image/')) {
+                try {
+                    const originalDataUrl = await fileToBase64(file);
+                    
+                    // Resize and store the Base64 image
+                    base64Image = await resizeImage(originalDataUrl);
+
+                    displayPreview(base64Image);
+                } catch (error) {
+                    console.error("Error processing file:", error);
+                    displayError("Could not process the uploaded image.");
+                }
+            } else if (file) {
+                displayError("Please upload a valid image file.");
+            }
+            // Reset file input value so same file can be uploaded again
+            event.target.value = '';
+        }
+
+        // --- CLEAR IMAGE FUNCTION ---
+
+        function clearImage(resetCameraControls = true) {
+            base64Image = null;
+            imagePreview.src = '';
+            imagePreviewContainer.classList.add('hidden');
+            initialPlaceholder.classList.remove('hidden');
+            clearBtn.classList.add('hidden');
+            finalImagePreview.src = '';
+            visualAnalysisSection.classList.add('hidden');
+
+            if (resetCameraControls) {
+                 placeholderText.textContent = 'Click "Start Camera" or Upload Image';
+            }
+        }
+
+
+        // --- API CALL MODIFICATION (MULTIMODAL) ---
+
+        /**
+         * Fetches a personalized tip from the Gemini API, optionally including image analysis.
+         */
+        async function fetchPersonalizedTip(skinType, concern, imageBase64) {
+            
+            let userQuery = `Skincare advice for ${skinType} skin concerning ${concern}. Provide a specific product name or technique.`;
+            let systemPrompt = `You are a professional, highly knowledgeable esthetician and dermatologist. Your task is to provide one highly specific, actionable skincare tip or product recommendation for a person with ${skinType} skin who is concerned about ${concern}. Keep your response extremely concise, under 50 words, focusing only on the advice and the product name if mentioned. Do not use conversational openings or closings.`;
+            
+            const contentsParts = [];
+
+            if (imageBase64) {
+                // If an image is provided, include it as the first part
+                try {
+                    const [header, data] = imageBase64.split(',');
+                    // FIX 2: Ensure robust MIME type extraction
+                    const mimeType = header.match(/:(.*?);/)?.[1] || 'image/jpeg';
+
+                    contentsParts.push({
+                        inlineData: {
+                            mimeType: mimeType,
+                            data: data
+                        }
+                    });
+                } catch (e) {
+                    console.error("Error parsing Base64 image:", e);
+                    displayError("Image format error. Falling back to text-only analysis.");
+                }
+                
+                // Enhance the prompt when an image is present
+                userQuery += " Analyze the provided image of the skin to give highly tailored advice based on visual assessment (e.g., texture, redness, acne severity) in addition to the text context.";
+                systemPrompt = systemPrompt.replace("Your task is", "Your task is to visually assess the skin in the image and provide a highly specific, actionable skincare tip or product recommendation. Keep your response extremely concise, under 50 words.");
+            }
+
+            contentsParts.push({ text: userQuery });
+
+            const payload = {
+                contents: [{ parts: contentsParts }],
+                // Enable Google Search grounding for up-to-date advice/products
+                tools: [{ "google_search": {} }],
+                systemInstruction: {
+                    parts: [{ text: systemPrompt }]
+                },
+            };
+
+            const apiUrl = `${API_URL_BASE}?key=${API_KEY}`;
+            
+            // Retry mechanism for API calls
+            for (let i = 0; i < 3; i++) {
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (!response.ok) {
+                        const errorBody = await response.text(); // FIX 1: Read and log the response body for debugging
+                        console.error(`API Error Body (Status ${response.status}):`, errorBody);
+
+                        let errorMsg = `API returned status ${response.status}.`;
+                        if (response.status === 503) {
+                            errorMsg += " The service is temporarily unavailable. This is likely a transient issue. Please try again. (Hint: This can be caused by very large images.)";
+                        } else if (response.status === 400 || response.status === 403) {
+                            errorMsg += " Authentication failed or request format is incorrect. Check your API key and image data.";
+                        }
+                        throw new Error(errorMsg);
+                    }
+
+                    const result = await response.json();
+                    const candidate = result.candidates?.[0];
+
+                    if (candidate && candidate.content?.parts?.[0]?.text) {
+                        const text = candidate.content.parts[0].text;
+                        let sources = [];
+                        const groundingMetadata = candidate.groundingMetadata;
+                        
+                        if (groundingMetadata && groundingMetadata.groundingAttributions) {
+                            sources = groundingMetadata.groundingAttributions
+                                .map(attribution => ({
+                                    uri: attribution.web?.uri,
+                                    title: attribution.web?.title,
+                                }))
+                                .filter(source => source.uri && source.title);
+                        }
+
+                        return { text, sources };
+                    } else {
+                        throw new Error("No generated content received from the API. The API key may be invalid.");
+                    }
+                } catch (error) {
+                    console.error(`Attempt ${i + 1} failed:`, error);
+                    if (i < 2) {
+                        // FIX: Increase backoff time to better handle server overload (503)
+                        await new Promise(resolve => setTimeout(resolve, Math.pow(2, i + 1) * 1000)); // New delays: 2s, 4s, 8s
+                    } else {
+                        // Re-throw the last error after all retries fail
+                        throw error;
+                    }
+                }
+            }
+        }
+
+        /**
+         * Defines a basic routine based on skin type. (Unchanged from previous version)
+         */
+        function getBaseRoutine(type) {
+            const routines = {
+                Morning: [
+                    { step: 1, name: 'Cleanser', details: `A gentle, non-stripping cleanser. If ${type === 'Oily' ? 'oily' : 'dry'}, consider a simple rinse with water.` },
+                    { step: 2, name: 'Treatment/Serum', details: `Vitamin C (for antioxidants) or Niacinamide (for oil control/barrier).` },
+                    { step: 3, name: 'Moisturizer', details: `${type === 'Dry' ? 'A rich, occlusive cream.' : type === 'Oily' ? 'A lightweight, oil-free gel.' : 'A standard hydrating lotion.'}` },
+                    { step: 4, name: 'Sunscreen (SPF 30+)', details: 'The most important step! Apply a broad-spectrum SPF 30+ daily.' },
+                ],
+                Evening: [
+                    { step: 1, name: 'Double Cleanse', details: 'Use an oil cleanser first (to remove SPF/makeup), followed by your regular cleanser.' },
+                    { step: 2, name: 'Targeted Treatment', details: `Focus on your concern here: Retinoids (aging/acne), AHA/BHA (texture), or hydrating mask.` },
+                    { step: 3, name: 'Eye Cream', details: 'Gently tap around the orbital bone.' },
+                    { step: 4, name: 'Moisturizer', details: `${type === 'Dry' ? 'A thick balm or night cream.' : 'A restorative, barrier-focused cream.'}` },
+                ]
+            };
+
+            let html = '';
+            for (const time in routines) {
+                html += `<div class="p-3 bg-white rounded-md shadow-sm border border-gray-100">
+                            <h4 class="text-md font-bold text-gray-700 mb-2">${time} Routine</h4>
+                            <ul class="space-y-2">`;
+                routines[time].forEach(item => {
+                    html += `<li class="flex items-start text-sm text-gray-600">
+                                <span class="font-bold text-blue-500 mr-2">${item.step}.</span>
+                                <div>
+                                    <strong class="text-gray-800">${item.name}:</strong> ${item.details}
+                                </div>
+                             </li>`;
+                });
+                html += `</ul></div>`;
+            }
+            return html;
+        }
+        
+        /**
+         * Main function to generate the routine and call the AI.
+         */
+        async function generateRoutine() {
+            const skinType = skinTypeSelect.value;
+            const concern = concernInput.value.trim();
+
+            if (!skinType || concern.length < 3) {
+                displayError("Please select a skin type and briefly describe your main concern (at least 3 characters).");
+                return;
+            }
+
+            setLoadingState(true);
+            errorMessageDiv.classList.add('hidden');
+            citationsDiv.innerHTML = '';
+            aiTip.textContent = '';
+            
+            try {
+                // 1. Generate the static routine
+                routineSteps.innerHTML = getBaseRoutine(skinType);
+
+                // 2. Fetch the personalized AI tip, passing the Base64 image
+                const { text, sources } = await fetchPersonalizedTip(skinType, concern, base64Image);
+                
+                aiTip.textContent = text || "Sorry, I couldn't generate a specific tip right now, but follow the core routine above!";
+                
+                // 3. Display citations if available
+                if (sources.length > 0) {
+                    citationsDiv.innerHTML = '<p class="font-medium text-gray-600">Sources:</p>';
+                    sources.forEach((source, index) => {
+                        const link = document.createElement('a');
+                        link.href = source.uri;
+                        link.target = '_blank';
+                        link.className = 'block text-blue-500 hover:text-blue-700 truncate';
+                        link.textContent = `${index + 1}. ${source.title}`;
+                        citationsDiv.appendChild(link);
+                    });
+                }
+
+                // 4. Display the analyzed image if one was used
+                if (base64Image) {
+                    finalImagePreview.src = base64Image;
+                    visualAnalysisSection.classList.remove('hidden');
+                } else {
+                    visualAnalysisSection.classList.add('hidden');
+                }
+
+                // 5. Show output
+                inputSection.classList.add('hidden');
+                outputSection.classList.remove('hidden');
+
+            } catch (error) {
+                console.error("Routine Generation Error:", error);
+                // Display the specific error message from the API call or general fallback
+                displayError(`Routine Generation Failed: ${error.message || "An unknown network or API error occurred."}`);
+            } finally {
+                setLoadingState(false);
+            }
+        }
+
+        /**
+         * Resets the application state to start a new routine.
+         */
+        function resetApp() {
+            skinTypeSelect.value = "";
+            concernInput.value = "";
+            routineSteps.innerHTML = '';
+            aiTip.textContent = '';
+            citationsDiv.innerHTML = '';
+            errorMessageDiv.classList.add('hidden');
+            outputSection.classList.add('hidden');
+            inputSection.classList.remove('hidden');
+            clearImage(); // Clear image and related outputs
+            clearCamera(); // Ensure camera is stopped
+        }
+
+        // Initialize camera controls and clear image state on load
+        window.onload = resetApp; 
+
+    </script>
+</body>
+</html>
