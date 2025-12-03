@@ -53,18 +53,7 @@ The purpose of this system is to support dermatology-inspired guidance and help 
 
 ---
 
-## 📁 Folder Structure (Example)
 
-```
-
-📦 Facial-Skincare-Recommendation-System
-┣ 📁 models
-┣ 📁 dataset
-┣ 📁 scripts
-┣ 📁 ui
-┣ 📄 app.py
-┣ 📄 requirements.txt
-┗ 📄 README.md
 
 ````
 
@@ -86,7 +75,7 @@ pip install -r requirements.txt
 ### 3️⃣ Run the application
 
 ```sh
-python app.py
+facial.html 
 ```
 
 ---
